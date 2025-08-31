@@ -208,47 +208,6 @@ registry = {"summarize_csv": MyDataOps().summarize_csv}
 
 ---
 
-## Testing
-
-This repo ships pytest integration tests that hit `gpt-5-nano`.
-
-### Install the package in editable mode
-
-```bash
-python -m pip install -U pip setuptools wheel
-python -m pip install -e .
-```
-
-### Set your API key
-
-```bash
-# macOS/Linux
-export OPENAI_API_KEY=sk-...
-
-# Windows PowerShell
-$env:OPENAI_API_KEY = "sk-..."
-```
-
-### Run tests
-
-```bash
-pytest -vv
-```
-
-If you see `ModuleNotFoundError: agentkit_gf`, make sure you ran the editable install, or set `PYTHONPATH` to the repo root for the session.
-
----
-
-## Design Principles
-
-* **Reasoning-first**: answer from context when possible; use tools **only when necessary**.
-* **Fail-fast**: explicit validation, actionable error messages, no silent fallbacks.
-* **Strong typing**: Pydantic models for all tool results; no raw dicts in public APIs.
-* **Separation of concerns**: reasoning agent vs. executor agent; clean gateway (`delegate_ops`).
-* **Security knobs**: tool sandboxes (`root_dir`, `root_cwd`), allowlists, output clipping.
-
----
-
 ## API Reference (quick)
 
 ### `SoftToolAgent`
