@@ -1,0 +1,4 @@
+{
+  "venvPath": ".",
+  "reportMissingImports": "warning"
+}
