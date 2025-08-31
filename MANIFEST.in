@@ -1,0 +1,37 @@
+# Include README and license
+include README.md
+include LICENSE
+include pyproject.toml
+
+# Include Python package files
+recursive-include agentkit_gf *.py
+recursive-include agentkit_gf *.pyi
+
+# Test files are NOT included in the package (only for development)
+# recursive-include tests *.py
+global-exclude tests/
+global-exclude tests/*
+exclude tests/
+exclude tests/*
+
+# Include configuration files
+include pyrightconfig.json
+include requirements.txt
+
+# Exclude unnecessary files
+global-exclude *.pyc
+global-exclude *.pyo
+global-exclude *.pyd
+global-exclude __pycache__
+global-exclude .git*
+global-exclude .DS_Store
+global-exclude *.egg-info
+global-exclude .pytest_cache
+global-exclude .mypy_cache
+global-exclude .coverage
+global-exclude htmlcov
+global-exclude .tox
+global-exclude .venv
+global-exclude venv
+global-exclude env
+global-exclude .env
