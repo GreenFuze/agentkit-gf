@@ -2,7 +2,7 @@
 # Usage: .\publish-to-pypi.ps1 [version]
 
 param(
-    [string]$Version = "0.1.0"
+    [string]$Version = "0.1.3"
 )
 
 Write-Host "🚀 Publishing agentkit-gf version $Version to PyPI" -ForegroundColor Green
@@ -20,7 +20,7 @@ if (-not (Test-Path "agentkit_gf")) {
 }
 
 # Update version in pyproject.toml if provided
-if ($Version -ne "0.1.0") {
+if ($Version -ne "0.1.3") {
     Write-Host "📝 Updating version to $Version in pyproject.toml..." -ForegroundColor Yellow
     $content = Get-Content "pyproject.toml" -Raw
     $content = $content -replace 'version = "0\.1\.0"', "version = `"$Version`""

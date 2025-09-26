@@ -72,10 +72,16 @@ class _Root:
         if not user_path:
             raise ValueError("path is required and must be non-empty")
 
-        p = Path(user_path).expanduser().resolve(strict=False)
-
         if self.root is None:
-            return p
+            return Path(user_path).expanduser().resolve(strict=False)
+
+        # For relative paths, resolve them relative to the root directory
+        user_path_obj = Path(user_path).expanduser()
+        if user_path_obj.is_absolute():
+            p = user_path_obj.resolve(strict=False)
+        else:
+            # Relative path - resolve relative to root
+            p = (self.root / user_path_obj).resolve(strict=False)
 
         root = self.root
         # Python <3.9 compatibility: use try/except on relative_to

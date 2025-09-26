@@ -109,6 +109,7 @@ class _ToolExecutorAgent(_BaseAgent[str]):
         toolset: AbstractToolset,
         builtin_enums: Sequence[BuiltinTool],
         system_prompt: Optional[str] = None,
+        model_settings: Optional[ModelSettings] = None,
     ):
         if builtin_enums is None:
             raise ValueError("builtin_enums must be provided (use [] if no builtins)")
@@ -127,6 +128,15 @@ class _ToolExecutorAgent(_BaseAgent[str]):
             else:
                 raise ValueError(f"Unhandled BuiltinTool enum: {t!r}")
 
+        # Merge user model_settings with default settings
+        default_settings = ModelSettings(parallel_tool_calls=False)
+        if model_settings:
+            # Merge user settings with defaults
+            merged_settings = ModelSettings(default_settings)
+            merged_settings.update(model_settings)
+        else:
+            merged_settings = default_settings
+
         super().__init__(
             model,
             system_prompt=system_prompt
@@ -135,7 +145,7 @@ class _ToolExecutorAgent(_BaseAgent[str]):
             toolsets=[toolset],
             builtin_tools=builtin_tools_instances or None,
             output_type=str,  # native string output
-            model_settings=ModelSettings(parallel_tool_calls=False),
+            model_settings=merged_settings,
         )
 
 
@@ -156,9 +166,16 @@ class DelegatingToolsAgent(_BaseAgent[str]):
         class_prefix: Optional[str] = None,
         system_prompt: Optional[str] = None,
         ops_system_prompt: Optional[str] = None,
+        model_settings: Optional[ModelSettings] = None,
+        real_time_log_user: bool = False,
+        real_time_log_agent: bool = False,
     ):
         if builtin_enums is None:
             raise ValueError("builtin_enums must be provided (use [] if no builtins)")
+
+        # Store logging parameters
+        self._real_time_log_user = real_time_log_user
+        self._real_time_log_agent = real_time_log_agent
 
         toolset = _build_combined_toolset(tool_sources, class_prefix=class_prefix)
 
@@ -167,18 +184,28 @@ class DelegatingToolsAgent(_BaseAgent[str]):
             toolset=toolset,
             builtin_enums=builtin_enums,
             system_prompt=ops_system_prompt,
+            model_settings=model_settings,
         )
+
+        # Merge user model_settings with default settings
+        default_settings = ModelSettings(parallel_tool_calls=False)
+        if model_settings:
+            # Merge user settings with defaults
+            merged_settings = ModelSettings(default_settings)
+            merged_settings.update(model_settings)
+        else:
+            merged_settings = default_settings
 
         super().__init__(
             model,
             system_prompt=system_prompt
-            or ("Answer-first. Use delegate_ops only if a specific missing fact or operation "
-                "requires web/file/shell/etc. Prefer one well-justified operation over exploration."),
+            or ("Use delegate_ops to access files and execute commands when needed. "
+                "Provide a brief justification for each tool use."),
             tools=[self.delegate_ops],
             toolsets=None,
             builtin_tools=None,
             output_type=str,
-            model_settings=ModelSettings(parallel_tool_calls=False),
+            model_settings=merged_settings,
         )
 
     # ---- Override run_sync to manage history automatically ----
@@ -186,10 +213,22 @@ class DelegatingToolsAgent(_BaseAgent[str]):
         if not prompt or not isinstance(prompt, str):
             raise ValueError("prompt must be a non-empty string")
 
+        # Real-time user input logging
+        if self._real_time_log_user:
+            print("🔵 USER INPUT:")
+            print(prompt)
+            print("=" * 80)
+
         self._history_add_user(prompt)
         composed = self._compose_history()
 
         res = super().run_sync(composed, *args, **kwargs)
+
+        # Real-time agent response logging
+        if self._real_time_log_agent:
+            print("🟢 AGENT RESPONSE:")
+            print(res.output)
+            print("=" * 80)
 
         self._history_add_assistant_text(res.output)
         return res
@@ -213,10 +252,9 @@ class DelegatingToolsAgent(_BaseAgent[str]):
         if not tool or not isinstance(tool, str):
             raise ModelRetry("Invalid 'tool' (expected non-empty string).")
 
-        if len(why.split()) < 8 or "because" not in why.lower():
+        if len(why.split()) < 3:
             raise ModelRetry(
-                "Justify the call: name the missing fact and why this tool resolves it. "
-                "If you can answer directly, do so instead."
+                "Provide a brief justification for using this tool."
             )
 
         try:
