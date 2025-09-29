@@ -6,11 +6,24 @@ from typing import Any, Generic, List, Optional, Sequence, TypeVar
 
 from pydantic_ai import Agent
 from pydantic_ai.settings import ModelSettings
+from pydantic_ai.usage import UsageLimits
 
 OutputT = TypeVar("OutputT")
 
 
-class _BaseAgent(Agent[None, OutputT], Generic[OutputT]):
+class _UnlimitedDeps:
+    """Custom deps class with unlimited usage limits."""
+    def __init__(self):
+        self.usage_limits = UsageLimits(request_limit=None)
+
+
+class _LimitedDeps:
+    """Custom deps class with configurable usage limits."""
+    def __init__(self, request_limit: Optional[int] = None):
+        self.usage_limits = UsageLimits(request_limit=request_limit)
+
+
+class _BaseAgent(Agent[_UnlimitedDeps, OutputT], Generic[OutputT]):
     """
     Base agent that adds a persistent conversation transcript and forwards
     constructor parameters to pydantic_ai.Agent using correct typing.
@@ -31,6 +44,7 @@ class _BaseAgent(Agent[None, OutputT], Generic[OutputT]):
         tools: Optional[Sequence[Any]] = None,
         toolsets: Optional[Sequence[Any]] = None,
         builtin_tools: Optional[Sequence[Any]] = None,
+        usage_limit: Optional[int] = None,
     ) -> None:
         if not model:
             raise ValueError("model must be provided")
@@ -42,6 +56,13 @@ class _BaseAgent(Agent[None, OutputT], Generic[OutputT]):
         toolsets_seq: Sequence[Any] = tuple(toolsets) if toolsets else ()
         builtin_tools_seq: Sequence[Any] = tuple(builtin_tools) if builtin_tools else ()
 
+        # Store usage_limit and initialize request counter
+        self._usage_limit = usage_limit
+        self._request_count = 0
+
+        # Always use unlimited deps since we'll handle limits ourselves
+        deps_type = _UnlimitedDeps
+
         super().__init__(
             model,
             system_prompt=system_prompt if system_prompt is not None else "",
@@ -50,7 +71,17 @@ class _BaseAgent(Agent[None, OutputT], Generic[OutputT]):
             builtin_tools=builtin_tools_seq,
             output_type=output_type,
             model_settings=model_settings,
+            deps_type=deps_type,
         )
+
+    # -------- Usage limit checking --------
+    
+    def _check_usage_limit(self) -> None:
+        """Check if usage limit has been exceeded."""
+        if self._usage_limit is not None:
+            if self._request_count >= self._usage_limit:
+                raise Exception(f"The next request would exceed the request_limit of {self._usage_limit}")
+            self._request_count += 1
 
     # -------- Conversation history API (public) --------
 

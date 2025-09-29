@@ -110,6 +110,7 @@ class _ToolExecutorAgent(_BaseAgent[str]):
         builtin_enums: Sequence[BuiltinTool],
         system_prompt: Optional[str] = None,
         model_settings: Optional[ModelSettings] = None,
+        usage_limit: Optional[int] = None,
     ):
         if builtin_enums is None:
             raise ValueError("builtin_enums must be provided (use [] if no builtins)")
@@ -146,6 +147,7 @@ class _ToolExecutorAgent(_BaseAgent[str]):
             builtin_tools=builtin_tools_instances or None,
             output_type=str,  # native string output
             model_settings=merged_settings,
+            usage_limit=usage_limit,
         )
 
 
@@ -169,6 +171,7 @@ class DelegatingToolsAgent(_BaseAgent[str]):
         model_settings: Optional[ModelSettings] = None,
         real_time_log_user: bool = False,
         real_time_log_agent: bool = False,
+        usage_limit: Optional[int] = None,
     ):
         if builtin_enums is None:
             raise ValueError("builtin_enums must be provided (use [] if no builtins)")
@@ -185,6 +188,7 @@ class DelegatingToolsAgent(_BaseAgent[str]):
             builtin_enums=builtin_enums,
             system_prompt=ops_system_prompt,
             model_settings=model_settings,
+            usage_limit=usage_limit,
         )
 
         # Merge user model_settings with default settings
@@ -206,6 +210,7 @@ class DelegatingToolsAgent(_BaseAgent[str]):
             builtin_tools=None,
             output_type=str,
             model_settings=merged_settings,
+            usage_limit=usage_limit,
         )
 
     # ---- Override run_sync to manage history automatically ----
@@ -213,9 +218,12 @@ class DelegatingToolsAgent(_BaseAgent[str]):
         if not prompt or not isinstance(prompt, str):
             raise ValueError("prompt must be a non-empty string")
 
+        # Check usage limit before processing
+        self._check_usage_limit()
+
         # Real-time user input logging
         if self._real_time_log_user:
-            print("🔵 USER INPUT:")
+            print("[USER] USER INPUT:")
             print(prompt)
             print("=" * 80)
 
@@ -226,7 +234,35 @@ class DelegatingToolsAgent(_BaseAgent[str]):
 
         # Real-time agent response logging
         if self._real_time_log_agent:
-            print("🟢 AGENT RESPONSE:")
+            print("[AGENT] AGENT RESPONSE:")
+            print(res.output)
+            print("=" * 80)
+
+        self._history_add_assistant_text(res.output)
+        return res
+
+    # ---- Override run to manage history automatically ----
+    async def run(self, prompt: str, *args: Any, **kwargs: Any):  # type: ignore[override]
+        if not prompt or not isinstance(prompt, str):
+            raise ValueError("prompt must be a non-empty string")
+
+        # Check usage limit before processing
+        self._check_usage_limit()
+
+        # Real-time user input logging
+        if self._real_time_log_user:
+            print("[USER] USER INPUT:")
+            print(prompt)
+            print("=" * 80)
+
+        self._history_add_user(prompt)
+        composed = self._compose_history()
+
+        res = await super().run(composed, *args, **kwargs)
+
+        # Real-time agent response logging
+        if self._real_time_log_agent:
+            print("[AGENT] AGENT RESPONSE:")
             print(res.output)
             print("=" * 80)
 

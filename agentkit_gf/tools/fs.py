@@ -204,9 +204,10 @@ class FileTools:
             mtime_epoch=st.st_mtime,
         ).model_dump()
 
-    def list_dir(self, path: str, *, include_hidden: bool = False, max_entries: int = 1000) -> dict:
+    def list_dir(self, path: str, *, include_hidden: bool = False, max_entries: int = 1000, glob_pattern: Optional[str] = None) -> dict:
         """
         List directory entries (non-recursive). Returns up to max_entries.
+        Optionally filter by glob pattern (e.g., "*.cmake", "CMakeLists.txt").
         """
         p = self._root.resolve_and_check(path)
 
@@ -222,6 +223,12 @@ class FileTools:
             for de in it:
                 if not include_hidden and de.name.startswith("."):
                     continue
+
+                # Apply glob filtering if specified
+                if glob_pattern:
+                    import fnmatch
+                    if not fnmatch.fnmatch(de.name, glob_pattern):
+                        continue
 
                 try:
                     st = de.stat(follow_symlinks=False)
