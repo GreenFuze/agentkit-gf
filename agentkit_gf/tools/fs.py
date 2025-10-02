@@ -212,7 +212,21 @@ class FileTools:
         p = self._root.resolve_and_check(path)
 
         if not p.exists():
-            raise FileNotFoundError(f"path not found: {p}")
+            # Provide helpful error message with suggestions
+            parent_dir = p.parent
+            if parent_dir.exists():
+                try:
+                    available_dirs = [d.name for d in parent_dir.iterdir() if d.is_dir()]
+                    suggestion = f"Available directories in {parent_dir}: {', '.join(available_dirs[:10])}"
+                    if len(available_dirs) > 10:
+                        suggestion += f" and {len(available_dirs) - 10} more"
+                    suggestion += ")"
+                except:
+                    suggestion = f"Parent directory {parent_dir} exists but cannot list contents"
+            else:
+                suggestion = f"Parent directory {parent_dir} does not exist"
+            
+            raise FileNotFoundError(f"path not found: {p}. {suggestion}")
 
         if not p.is_dir():
             raise NotADirectoryError(f"not a directory: {p}")
