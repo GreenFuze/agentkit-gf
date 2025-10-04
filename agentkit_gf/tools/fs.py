@@ -291,3 +291,95 @@ class FileTools:
                 h.update(chunk)
 
         return FileHash(path=str(p), algorithm=algorithm, hexdigest=h.hexdigest()).model_dump()
+
+    def get_file_metadata(self, path: str) -> dict:
+        """
+        Get objective file metadata only (no analysis or heuristics).
+        Returns raw data that LLM can analyze itself.
+        """
+        p = self._root.resolve_and_check(path)
+        
+        if not p.exists():
+            raise FileNotFoundError(f"file not found: {p}")
+        
+        st = p.stat()
+        
+        return {
+            "path": str(p),
+            "size_bytes": st.st_size,
+            "is_file": p.is_file(),
+            "is_dir": p.is_dir(),
+            "extension": p.suffix,
+            "name": p.name,
+            "parent": str(p.parent),
+            "mtime_epoch": st.st_mtime,
+            "mode_octal": oct(st.st_mode & 0o777)
+        }
+    
+    def validate_path_safety(self, path: str, boundary: Optional[str] = None) -> dict:
+        """
+        Validate path safety with explicit boundary.
+        Returns safety status without any analysis.
+        """
+        if boundary is None:
+            boundary = str(self._root.root) if self._root.root else "."
+        
+        try:
+            p = self._root.resolve_and_check(path)
+            boundary_path = Path(boundary).resolve()
+            
+            # Check if path is within boundary
+            try:
+                p.relative_to(boundary_path)
+                return {
+                    "safe": True,
+                    "path": str(p),
+                    "boundary": str(boundary_path),
+                    "within_boundary": True
+                }
+            except ValueError:
+                return {
+                    "safe": False,
+                    "path": str(p),
+                    "boundary": str(boundary_path),
+                    "within_boundary": False,
+                    "error": "Path outside boundary"
+                }
+        except Exception as e:
+            return {
+                "safe": False,
+                "path": path,
+                "boundary": boundary,
+                "within_boundary": False,
+                "error": str(e)
+            }
+    
+    def get_repository_root(self) -> dict:
+        """
+        Get the repository root directory path.
+        """
+        root_path = str(self._root.root) if self._root.root else "."
+        return {"repository_root": root_path}
+    
+    def check_path_exists(self, path: str) -> dict:
+        """
+        Check if path exists without accessing it.
+        """
+        try:
+            p = self._root.resolve_and_check(path)
+            exists = p.exists()
+            result = {
+                "exists": exists,
+                "path": str(p),
+                "is_file": p.is_file() if exists else False,
+                "is_dir": p.is_dir() if exists else False
+            }
+            if not exists:
+                result["error"] = "Path does not exist"
+            return result
+        except Exception as e:
+            return {
+                "exists": False,
+                "path": path,
+                "error": str(e)
+            }
